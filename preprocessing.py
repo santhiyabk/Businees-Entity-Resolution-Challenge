@@ -5,22 +5,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 TRAIN_DIR = BASE_DIR / "dataset" / "train"
+OUTPUT_DIR = BASE_DIR / "processed_data"
 
-
-def load_data(file_name, nrows=1000):
-    file_path = TRAIN_DIR / file_name
-
-    rows = []
-
-    with open(file_path, "r", encoding="utf-8", errors="replace") as file:
-        reader = csv.DictReader(file, delimiter="\t")
-
-        for i, row in enumerate(reader):
-            if i >= nrows:
-                break
-            rows.append(row)
-
-    return rows
+OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 def normalize_name(value):
@@ -71,60 +58,92 @@ def normalize_address(value):
     return value
 
 
-def preprocess_data(rows):
+def preprocess_file(input_file, output_file):
 
-    for row in rows:
+    print(f"\nProcessing: {input_file.name}")
 
-        row["business_name_normalized"] = normalize_name(
-            row.get("business_name", "")
-        )
+    with open(
+        input_file,
+        "r",
+        encoding="utf-8",
+        errors="replace",
+        newline=""
+    ) as infile:
 
-        row["business_address_normalized"] = normalize_address(
-            row.get("business_address", "")
-        )
+        reader = csv.DictReader(infile, delimiter="\t")
 
-        row["country_normalized"] = (
-            row.get("country", "").lower().strip()
-        )
+        fieldnames = list(reader.fieldnames)
 
-    return rows
+        fieldnames.extend([
+            "business_name_normalized",
+            "business_address_normalized",
+            "country_normalized"
+        ])
+
+        with open(
+            output_file,
+            "w",
+            encoding="utf-8",
+            newline=""
+        ) as outfile:
+
+            writer = csv.DictWriter(
+                outfile,
+                fieldnames=fieldnames,
+                delimiter="\t"
+            )
+
+            writer.writeheader()
+
+            count = 0
+
+            for row in reader:
+
+                row["business_name_normalized"] = normalize_name(
+                    row.get("business_name", "")
+                )
+
+                row["business_address_normalized"] = normalize_address(
+                    row.get("business_address", "")
+                )
+
+                row["country_normalized"] = (
+                    row.get("country", "").lower().strip()
+                )
+
+                writer.writerow(row)
+
+                count += 1
+
+                if count % 100000 == 0:
+                    print(f"  Processed {count:,} rows")
+
+    print(f"Completed: {count:,} rows")
 
 
 if __name__ == "__main__":
 
-    print("Loading training data...")
+    print("======================================")
+    print("Business Entity Resolution")
+    print("Full Data Preprocessing")
+    print("======================================")
 
-    source1 = load_data("train_source1.tsv")
-    source2 = load_data("train_source2.tsv")
-    source3 = load_data("train_source3.tsv")
+    preprocess_file(
+        TRAIN_DIR / "train_source1.tsv",
+        OUTPUT_DIR / "source1_clean.tsv"
+    )
 
-    print("Source 1 rows:", len(source1))
-    print("Source 2 rows:", len(source2))
-    print("Source 3 rows:", len(source3))
+    preprocess_file(
+        TRAIN_DIR / "train_source2.tsv",
+        OUTPUT_DIR / "source2_clean.tsv"
+    )
 
-    print("\nPreprocessing...")
+    preprocess_file(
+        TRAIN_DIR / "train_source3.tsv",
+        OUTPUT_DIR / "source3_clean.tsv"
+    )
 
-    source1 = preprocess_data(source1)
-    source2 = preprocess_data(source2)
-    source3 = preprocess_data(source3)
-
-    print("Preprocessing completed!")
-
-    print("\nSample normalized data:")
-
-    for row in source1[:5]:
-        print(
-            "Name:",
-            row.get("business_name"),
-            "->",
-            row.get("business_name_normalized")
-        )
-
-        print(
-            "Address:",
-            row.get("business_address"),
-            "->",
-            row.get("business_address_normalized")
-        )
-
-        print()
+    print("\n======================================")
+    print("ALL PREPROCESSING COMPLETED!")
+    print(f"Output folder: {OUTPUT_DIR}")
+    print("======================================")
